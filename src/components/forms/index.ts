@@ -1,0 +1,12 @@
+export { ProspectoForm } from './ProspectoForm';
+export { ClienteForm } from './ClienteForm';
+export { CotizacionForm } from './CotizacionForm';
+export { ProyectoForm } from './ProyectoForm';
+export { TicketForm } from './TicketForm';
+export { CampanaForm } from './CampanaForm';
+export { LeadForm } from './LeadForm';
+export { ContenidoForm } from './ContenidoForm';
+export { ServicioRecurrenteForm } from './ServicioRecurrenteForm';
+export { TransaccionForm } from './TransaccionForm';
+export { PaqueteForm } from './PaqueteForm';
+export { UsuarioForm } from './UsuarioForm';
