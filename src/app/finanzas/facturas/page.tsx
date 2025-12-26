@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { MainLayout } from '@/components/layout';
 import { Button, Card, CardBody, Badge, Input, Avatar } from '@/components/ui';
-import { mockClientes } from '@/lib/mock-data';
+import { useAppStore } from '@/lib/store';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   Plus,
@@ -19,69 +19,36 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
-// Mock facturas
-const mockFacturas = [
-  {
-    id: '1',
-    numero: 'FAC-2024-0023',
-    clienteId: '1',
-    total: 45000,
-    estado: 'pagada',
-    fechaEmision: new Date('2024-11-20'),
-    fechaVencimiento: new Date('2024-12-05'),
-    fechaPago: new Date('2024-11-28'),
-  },
-  {
-    id: '2',
-    numero: 'FAC-2024-0024',
-    clienteId: '2',
-    total: 42500,
-    estado: 'enviada',
-    fechaEmision: new Date('2024-12-01'),
-    fechaVencimiento: new Date('2024-12-16'),
-  },
-  {
-    id: '3',
-    numero: 'FAC-2024-0025',
-    clienteId: '3',
-    total: 60000,
-    estado: 'pagada',
-    fechaEmision: new Date('2024-12-10'),
-    fechaVencimiento: new Date('2024-12-25'),
-    fechaPago: new Date('2024-12-15'),
-  },
-  {
-    id: '4',
-    numero: 'FAC-2024-0026',
-    clienteId: '4',
-    total: 17500,
-    estado: 'vencida',
-    fechaEmision: new Date('2024-11-14'),
-    fechaVencimiento: new Date('2024-11-29'),
-  },
-  {
-    id: '5',
-    numero: 'FAC-2024-0027',
-    clienteId: '5',
-    total: 27500,
-    estado: 'borrador',
-    fechaEmision: new Date('2024-12-22'),
-    fechaVencimiento: new Date('2025-01-06'),
-  },
-];
-
 export default function FacturasPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState<string>('all');
 
-  const filteredFacturas = mockFacturas.filter((f) => {
+  // Obtener datos del store
+  const clientes = useAppStore((state) => state.clientes);
+  const cotizaciones = useAppStore((state) => state.cotizaciones);
+
+  // Generar facturas desde cotizaciones aceptadas o enviadas
+  const facturas = cotizaciones
+    .filter(c => c.estado === 'aceptada' || c.estado === 'enviada')
+    .map(c => ({
+      id: c.id,
+      numero: `FAC-${new Date(c.fechaCreacion).getFullYear()}-${c.id.slice(0, 4).toUpperCase()}`,
+      clienteId: c.clienteId || '',
+      total: c.total,
+      estado: c.estado === 'aceptada' ? 'pagada' : 'enviada',
+      fechaEmision: new Date(c.fechaCreacion),
+      fechaVencimiento: new Date(c.fechaCreacion),
+      fechaPago: c.estado === 'aceptada' ? new Date() : undefined,
+    }));
+
+  const filteredFacturas = facturas.filter((f) => {
     const matchesSearch = f.numero.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesEstado = filterEstado === 'all' || f.estado === filterEstado;
     return matchesSearch && matchesEstado;
   });
 
   const getClienteName = (clienteId: string) => {
-    const cliente = mockClientes.find(c => c.id === clienteId);
+    const cliente = clientes.find(c => c.id === clienteId);
     return cliente?.nombre || 'Cliente';
   };
 
@@ -108,11 +75,11 @@ export default function FacturasPage() {
   };
 
   // Stats
-  const totalFacturado = mockFacturas.reduce((sum, f) => sum + f.total, 0);
-  const facturasPagedas = mockFacturas.filter(f => f.estado === 'pagada');
+  const totalFacturado = facturas.reduce((sum, f) => sum + f.total, 0);
+  const facturasPagedas = facturas.filter(f => f.estado === 'pagada');
   const totalCobrado = facturasPagedas.reduce((sum, f) => sum + f.total, 0);
-  const pendienteCobro = mockFacturas.filter(f => f.estado === 'enviada' || f.estado === 'vencida').reduce((sum, f) => sum + f.total, 0);
-  const facturasVencidas = mockFacturas.filter(f => f.estado === 'vencida').length;
+  const pendienteCobro = facturas.filter(f => f.estado === 'enviada' || f.estado === 'vencida').reduce((sum, f) => sum + f.total, 0);
+  const facturasVencidas = facturas.filter(f => f.estado === 'vencida').length;
 
   return (
     <MainLayout

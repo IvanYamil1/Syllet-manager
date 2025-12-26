@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { MainLayout } from '@/components/layout';
 import { Button, Card, CardBody, Badge, Input, Avatar } from '@/components/ui';
-import { mockUsers, mockProyectos } from '@/lib/mock-data';
+import { useAppStore } from '@/lib/store';
 import { formatDate } from '@/lib/utils';
 import {
   Plus,
@@ -21,7 +21,11 @@ export default function EquipoPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartamento, setFilterDepartamento] = useState<string>('all');
 
-  const filteredUsers = mockUsers.filter((u) => {
+  // Obtener datos del store
+  const usuarios = useAppStore((state) => state.usuarios);
+  const proyectos = useAppStore((state) => state.proyectos);
+
+  const filteredUsers = usuarios.filter((u) => {
     const matchesSearch =
       `${u.nombre} ${u.apellido}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase());
@@ -65,18 +69,18 @@ export default function EquipoPage() {
 
   // Get projects assigned to user
   const getProjectsForUser = (userId: string) => {
-    return mockProyectos.filter(p =>
+    return proyectos.filter(p =>
       p.desarrolladorId === userId || p.desarrolladores.includes(userId)
     );
   };
 
   // Stats by department
   const usersByDepartment = {
-    direccion: mockUsers.filter(u => u.departamento === 'direccion').length,
-    ventas: mockUsers.filter(u => u.departamento === 'ventas').length,
-    operaciones: mockUsers.filter(u => u.departamento === 'operaciones').length,
-    soporte: mockUsers.filter(u => u.departamento === 'soporte').length,
-    marketing: mockUsers.filter(u => u.departamento === 'marketing').length,
+    direccion: usuarios.filter(u => u.departamento === 'direccion').length,
+    ventas: usuarios.filter(u => u.departamento === 'ventas').length,
+    operaciones: usuarios.filter(u => u.departamento === 'operaciones').length,
+    soporte: usuarios.filter(u => u.departamento === 'soporte').length,
+    marketing: usuarios.filter(u => u.departamento === 'marketing').length,
   };
 
   return (

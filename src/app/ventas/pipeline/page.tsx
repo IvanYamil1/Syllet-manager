@@ -2,28 +2,51 @@
 
 import React, { useState } from 'react';
 import { MainLayout } from '@/components/layout';
-import { Button, Card, CardBody, Badge, Input } from '@/components/ui';
+import { Button, Card, CardBody, Input } from '@/components/ui';
 import { PipelineBoard } from '@/components/ventas/PipelineBoard';
-import { mockProspectos } from '@/lib/mock-data';
+import { ProspectoForm } from '@/components/forms';
+import { ProspectoDetailModal } from '@/components/ventas/ProspectoDetailModal';
+import { useAppStore } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import { Plus, Filter, Search, TrendingUp, Users, DollarSign, Target } from 'lucide-react';
+import type { Prospecto, PipelineStage } from '@/types';
 
 export default function PipelinePage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedProspecto, setSelectedProspecto] = useState<Prospecto | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  const filteredProspectos = mockProspectos.filter(
+  const prospectos = useAppStore((state) => state.prospectos);
+  const updateProspecto = useAppStore((state) => state.updateProspecto);
+
+  const filteredProspectos = prospectos.filter(
     (p) =>
       p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.empresa?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Calcular métricas
-  const totalValor = mockProspectos.reduce((sum, p) => sum + p.valorEstimado, 0);
-  const valorPonderado = mockProspectos.reduce(
+  const totalValor = prospectos.reduce((sum, p) => sum + p.valorEstimado, 0);
+  const valorPonderado = prospectos.reduce(
     (sum, p) => sum + (p.valorEstimado * p.probabilidad) / 100,
     0
   );
-  const promedioConversion = mockProspectos.reduce((sum, p) => sum + p.probabilidad, 0) / mockProspectos.length;
+  const promedioConversion = prospectos.length > 0
+    ? prospectos.reduce((sum, p) => sum + p.probabilidad, 0) / prospectos.length
+    : 0;
+
+  const handleProspectoClick = (prospecto: Prospecto) => {
+    setSelectedProspecto(prospecto);
+    setIsDetailOpen(true);
+  };
+
+  const handleStageChange = (prospectoId: string, newStage: PipelineStage) => {
+    updateProspecto(prospectoId, {
+      etapa: newStage,
+      fechaUltimaActualizacion: new Date()
+    });
+  };
 
   return (
     <MainLayout
@@ -34,7 +57,7 @@ export default function PipelinePage() {
           <Button variant="secondary" leftIcon={<Filter size={16} />}>
             Filtrar
           </Button>
-          <Button leftIcon={<Plus size={16} />}>
+          <Button leftIcon={<Plus size={16} />} onClick={() => setIsFormOpen(true)}>
             Nuevo Prospecto
           </Button>
         </div>
@@ -49,7 +72,7 @@ export default function PipelinePage() {
             </div>
             <div>
               <p className="text-sm text-zinc-500">Total Prospectos</p>
-              <p className="text-2xl font-bold text-zinc-900">{mockProspectos.length}</p>
+              <p className="text-2xl font-bold text-zinc-900">{prospectos.length}</p>
             </div>
           </CardBody>
         </Card>
@@ -105,8 +128,20 @@ export default function PipelinePage() {
       {/* Pipeline Board */}
       <PipelineBoard
         prospectos={filteredProspectos}
-        onProspectoClick={(prospecto) => {
-          console.log('Prospecto clicked:', prospecto);
+        onProspectoClick={handleProspectoClick}
+        onStageChange={handleStageChange}
+      />
+
+      {/* Form Modal */}
+      <ProspectoForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
+
+      {/* Detail Modal */}
+      <ProspectoDetailModal
+        prospecto={selectedProspecto}
+        isOpen={isDetailOpen}
+        onClose={() => {
+          setIsDetailOpen(false);
+          setSelectedProspecto(null);
         }}
       />
     </MainLayout>

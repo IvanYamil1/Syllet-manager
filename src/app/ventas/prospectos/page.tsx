@@ -72,12 +72,10 @@ export default function ProspectosPage() {
           className="select max-w-[180px]"
         >
           <option value="all">Todas las etapas</option>
-          <option value="lead">Lead</option>
           <option value="contacto">Contacto</option>
           <option value="cotizacion">Cotización</option>
-          <option value="negociacion">Negociación</option>
-          <option value="cierre">Cierre</option>
-          <option value="perdido">Perdido</option>
+          <option value="proceso">En Proceso</option>
+          <option value="entregado">Entregado</option>
         </select>
       </div>
 

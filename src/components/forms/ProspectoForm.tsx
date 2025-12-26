@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Modal, ModalFooter, Button, Input, Select, Textarea } from '@/components/ui';
 import { useAppStore } from '@/lib/store';
 import type { PipelineStage, ServiceType } from '@/types';
-import { User, Building, Mail, Phone, DollarSign, Target } from 'lucide-react';
+import { User, Building, Mail, Phone, DollarSign, Target, MapPin } from 'lucide-react';
 
 interface ProspectoFormProps {
   isOpen: boolean;
@@ -12,8 +12,13 @@ interface ProspectoFormProps {
   vendedorId?: string;
 }
 
-export function ProspectoForm({ isOpen, onClose, vendedorId = '2' }: ProspectoFormProps) {
+export function ProspectoForm({ isOpen, onClose, vendedorId }: ProspectoFormProps) {
   const addProspecto = useAppStore((state) => state.addProspecto);
+  const usuarios = useAppStore((state) => state.usuarios);
+
+  // Obtener el primer vendedor o admin disponible como valor por defecto
+  const defaultVendedor = usuarios.find((u) => u.rol === 'vendedor' || u.rol === 'admin');
+  const actualVendedorId = vendedorId || defaultVendedor?.id || '';
   const [isLoading, setIsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -21,7 +26,8 @@ export function ProspectoForm({ isOpen, onClose, vendedorId = '2' }: ProspectoFo
     empresa: '',
     email: '',
     telefono: '',
-    etapa: 'lead' as PipelineStage,
+    direccion: '',
+    etapa: 'contacto' as PipelineStage,
     valorEstimado: 25000,
     probabilidad: 20,
     servicioInteres: 'web_profesional' as ServiceType,
@@ -33,9 +39,12 @@ export function ProspectoForm({ isOpen, onClose, vendedorId = '2' }: ProspectoFo
     setIsLoading(true);
 
     try {
-      addProspecto({
+      if (!actualVendedorId) {
+        throw new Error('No hay vendedor disponible para asignar el prospecto');
+      }
+      await addProspecto({
         ...formData,
-        vendedorId,
+        vendedorId: actualVendedorId,
       });
 
       // Reset form
@@ -44,7 +53,8 @@ export function ProspectoForm({ isOpen, onClose, vendedorId = '2' }: ProspectoFo
         empresa: '',
         email: '',
         telefono: '',
-        etapa: 'lead',
+        direccion: '',
+        etapa: 'contacto',
         valorEstimado: 25000,
         probabilidad: 20,
         servicioInteres: 'web_profesional',
@@ -52,16 +62,19 @@ export function ProspectoForm({ isOpen, onClose, vendedorId = '2' }: ProspectoFo
       });
 
       onClose();
+    } catch (error) {
+      console.error('Error creando prospecto:', error);
+      alert('Error al crear el prospecto. Verifica los datos e intenta de nuevo.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const etapaOptions = [
-    { value: 'lead', label: 'Lead' },
     { value: 'contacto', label: 'Contacto' },
     { value: 'cotizacion', label: 'Cotización' },
-    { value: 'negociacion', label: 'Negociación' },
+    { value: 'proceso', label: 'En Proceso' },
+    { value: 'entregado', label: 'Entregado' },
   ];
 
   const servicioOptions = [
@@ -118,6 +131,16 @@ export function ProspectoForm({ isOpen, onClose, vendedorId = '2' }: ProspectoFo
             leftIcon={<Phone size={16} />}
             required
           />
+
+          <div className="md:col-span-2">
+            <Input
+              label="Dirección"
+              placeholder="Calle, número, colonia, ciudad"
+              value={formData.direccion}
+              onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+              leftIcon={<MapPin size={16} />}
+            />
+          </div>
 
           <Select
             label="Etapa"

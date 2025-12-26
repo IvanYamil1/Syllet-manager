@@ -71,12 +71,10 @@ export type LeadSource =
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type PipelineStage =
-  | 'lead'
   | 'contacto'
   | 'cotizacion'
-  | 'negociacion'
-  | 'cierre'
-  | 'perdido';
+  | 'proceso'
+  | 'entregado';
 
 export interface Prospecto {
   id: string;
@@ -85,6 +83,7 @@ export interface Prospecto {
   empresa?: string;
   email: string;
   telefono: string;
+  direccion?: string;
   etapa: PipelineStage;
   valorEstimado: number;
   probabilidad: number; // 0-100

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(findstr:*)",
+      "Bash(Select-String -Pattern \"components|app\")",
+      "Bash(Select-Object -First 10)"
+    ]
+  }
+}

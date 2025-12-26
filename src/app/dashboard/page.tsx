@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { MainLayout } from '@/components/layout';
 import { Button } from '@/components/ui';
 import {
@@ -10,23 +10,137 @@ import {
   RecentProjects,
   RecentTickets,
 } from '@/components/dashboard';
-import { mockMetricas, mockProyectos, mockTickets } from '@/lib/mock-data';
+import { ProyectoForm } from '@/components/forms';
+import { useAppStore } from '@/lib/store';
 import {
   DollarSign,
   FolderKanban,
   Users,
   TrendingUp,
-  Ticket,
   Target,
   Plus,
   Download,
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const activeProjects = mockProyectos.filter(
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  // Obtener datos del store
+  const proyectos = useAppStore((state) => state.proyectos);
+  const tickets = useAppStore((state) => state.tickets);
+  const transacciones = useAppStore((state) => state.transacciones);
+  const leads = useAppStore((state) => state.leads);
+  const prospectos = useAppStore((state) => state.prospectos);
+  const usuarios = useAppStore((state) => state.usuarios);
+
+  // Calcular métricas dinámicamente
+  const metricas = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    // Ingresos del mes actual
+    const ingresosMes = transacciones
+      .filter(t => {
+        const fecha = new Date(t.fecha);
+        return t.tipo === 'ingreso' &&
+          fecha.getMonth() === currentMonth &&
+          fecha.getFullYear() === currentYear;
+      })
+      .reduce((sum, t) => sum + t.monto, 0);
+
+    // Ingresos del mes anterior
+    const ingresosMesAnterior = transacciones
+      .filter(t => {
+        const fecha = new Date(t.fecha);
+        return t.tipo === 'ingreso' &&
+          fecha.getMonth() === lastMonth &&
+          fecha.getFullYear() === lastMonthYear;
+      })
+      .reduce((sum, t) => sum + t.monto, 0);
+
+    // Proyectos activos
+    const proyectosActivos = proyectos.filter(
+      p => p.estado === 'en_desarrollo' || p.estado === 'pendiente'
+    ).length;
+
+    // Leads nuevos del mes
+    const leadsNuevos = leads.filter(l => {
+      const fecha = new Date(l.fechaCreacion);
+      return fecha.getMonth() === currentMonth && fecha.getFullYear() === currentYear;
+    }).length;
+
+    // Tasa de conversión (prospectos entregados / total prospectos * 100)
+    const prospectosConvertidos = prospectos.filter(p => p.etapa === 'entregado').length;
+    const tasaConversion = prospectos.length > 0
+      ? (prospectosConvertidos / prospectos.length) * 100
+      : 0;
+
+    // Ingresos por mes (últimos 6 meses)
+    const ingresosPorMes = [];
+    for (let i = 5; i >= 0; i--) {
+      const month = new Date(currentYear, currentMonth - i, 1);
+      const monthName = month.toLocaleDateString('es-MX', { month: 'short' });
+
+      const ingresos = transacciones
+        .filter(t => {
+          const fecha = new Date(t.fecha);
+          return t.tipo === 'ingreso' &&
+            fecha.getMonth() === month.getMonth() &&
+            fecha.getFullYear() === month.getFullYear();
+        })
+        .reduce((sum, t) => sum + t.monto, 0);
+
+      const egresos = transacciones
+        .filter(t => {
+          const fecha = new Date(t.fecha);
+          return t.tipo === 'egreso' &&
+            fecha.getMonth() === month.getMonth() &&
+            fecha.getFullYear() === month.getFullYear();
+        })
+        .reduce((sum, t) => sum + t.monto, 0);
+
+      ingresosPorMes.push({
+        mes: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+        ingresos,
+        egresos,
+        neto: ingresos - egresos,
+      });
+    }
+
+    // Ventas por vendedor
+    const vendedores = usuarios.filter(u => u.rol === 'vendedor' || u.rol === 'admin');
+    const ventasPorVendedor = vendedores.map(v => {
+      const ventasVendedor = prospectos
+        .filter(p => p.vendedorId === v.id && p.etapa === 'entregado')
+        .reduce((sum, p) => sum + p.valorEstimado, 0);
+
+      return {
+        vendedorId: v.id,
+        vendedorNombre: `${v.nombre} ${v.apellido}`,
+        ventas: ventasVendedor,
+        meta: v.metaMensual || 100000,
+        comisiones: ventasVendedor * ((v.comisionPorcentaje || 10) / 100),
+      };
+    }).sort((a, b) => b.ventas - a.ventas);
+
+    return {
+      ingresosMes,
+      ingresosMesAnterior,
+      proyectosActivos,
+      leadsNuevos,
+      tasaConversion,
+      ingresosPorMes,
+      ventasPorVendedor,
+    };
+  }, [transacciones, proyectos, leads, prospectos, usuarios]);
+
+  const activeProjects = proyectos.filter(
     (p) => p.estado === 'en_desarrollo' || p.estado === 'pendiente'
   );
-  const openTickets = mockTickets.filter(
+  const openTickets = tickets.filter(
     (t) => t.estado !== 'cerrado' && t.estado !== 'resuelto'
   );
 
@@ -39,7 +153,7 @@ export default function DashboardPage() {
           <Button variant="secondary" leftIcon={<Download size={16} />}>
             Exportar
           </Button>
-          <Button leftIcon={<Plus size={16} />}>
+          <Button leftIcon={<Plus size={16} />} onClick={() => setIsFormOpen(true)}>
             Nuevo Proyecto
           </Button>
         </div>
@@ -49,29 +163,29 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatsCard
           title="Ingresos del Mes"
-          value={mockMetricas.ingresosMes}
-          previousValue={mockMetricas.ingresosMesAnterior}
+          value={metricas.ingresosMes}
+          previousValue={metricas.ingresosMesAnterior}
           format="currency"
           icon={<DollarSign size={24} className="text-success-600" />}
           iconBg="bg-success-50"
         />
         <StatsCard
           title="Proyectos Activos"
-          value={mockMetricas.proyectosActivos}
+          value={metricas.proyectosActivos}
           icon={<FolderKanban size={24} className="text-syllet-600" />}
           iconBg="bg-syllet-50"
         />
         <StatsCard
           title="Leads Nuevos"
-          value={mockMetricas.leadsNuevos}
-          previousValue={18}
+          value={metricas.leadsNuevos}
+          previousValue={0}
           icon={<Users size={24} className="text-warning-600" />}
           iconBg="bg-warning-50"
         />
         <StatsCard
           title="Tasa de Conversión"
-          value={mockMetricas.tasaConversion}
-          previousValue={10.2}
+          value={metricas.tasaConversion}
+          previousValue={0}
           format="percent"
           icon={<Target size={24} className="text-primary-600" />}
           iconBg="bg-syllet-50"
@@ -82,12 +196,12 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Revenue Chart - Takes 2 columns */}
         <div className="lg:col-span-2">
-          <RevenueChart data={mockMetricas.ingresosPorMes} />
+          <RevenueChart data={metricas.ingresosPorMes} />
         </div>
 
         {/* Sales Leaderboard */}
         <div>
-          <SalesLeaderboard data={mockMetricas.ventasPorVendedor} />
+          <SalesLeaderboard data={metricas.ventasPorVendedor} />
         </div>
       </div>
 
@@ -121,6 +235,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Form Modal */}
+      <ProyectoForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
     </MainLayout>
   );
 }

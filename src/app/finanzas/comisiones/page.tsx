@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { MainLayout } from '@/components/layout';
 import { Button, Card, CardBody, CardHeader, Badge, Input, Avatar } from '@/components/ui';
-import { mockUsers, mockClientes, mockProyectos } from '@/lib/mock-data';
+import { useAppStore } from '@/lib/store';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   Search,
@@ -16,65 +16,42 @@ import {
   Users,
 } from 'lucide-react';
 
-// Mock comisiones
-const mockComisiones = [
-  {
-    id: '1',
-    vendedorId: '2',
-    proyectoId: '1',
-    clienteId: '1',
-    montoVenta: 45000,
-    porcentaje: 10,
-    montoComision: 4500,
-    estado: 'pagada',
-    fechaVenta: new Date('2024-11-20'),
-    fechaPago: new Date('2024-12-01'),
-  },
-  {
-    id: '2',
-    vendedorId: '3',
-    proyectoId: '2',
-    clienteId: '2',
-    montoVenta: 85000,
-    porcentaje: 10,
-    montoComision: 8500,
-    estado: 'aprobada',
-    fechaVenta: new Date('2024-12-01'),
-  },
-  {
-    id: '3',
-    vendedorId: '2',
-    proyectoId: '3',
-    clienteId: '3',
-    montoVenta: 120000,
-    porcentaje: 10,
-    montoComision: 12000,
-    estado: 'pendiente',
-    fechaVenta: new Date('2024-12-10'),
-  },
-  {
-    id: '4',
-    vendedorId: '3',
-    proyectoId: '4',
-    clienteId: '4',
-    montoVenta: 35000,
-    porcentaje: 10,
-    montoComision: 3500,
-    estado: 'pagada',
-    fechaVenta: new Date('2024-11-01'),
-    fechaPago: new Date('2024-11-15'),
-  },
-];
-
 export default function ComisionesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState<string>('all');
   const [filterVendedor, setFilterVendedor] = useState<string>('all');
 
-  const vendedores = mockUsers.filter(u => u.rol === 'vendedor');
+  // Obtener datos del store
+  const usuarios = useAppStore((state) => state.usuarios);
+  const clientes = useAppStore((state) => state.clientes);
+  const proyectos = useAppStore((state) => state.proyectos);
+  const prospectos = useAppStore((state) => state.prospectos);
 
-  const filteredComisiones = mockComisiones.filter((c) => {
-    const vendedor = mockUsers.find(u => u.id === c.vendedorId);
+  const vendedores = usuarios.filter(u => u.rol === 'vendedor');
+
+  type ComisionEstado = 'pendiente' | 'aprobada' | 'pagada';
+
+  // Generar comisiones desde prospectos entregados
+  const comisiones = prospectos
+    .filter(p => p.etapa === 'entregado')
+    .map(p => {
+      const vendedor = usuarios.find(u => u.id === p.vendedorId);
+      const porcentaje = vendedor?.comisionPorcentaje || 10;
+      return {
+        id: p.id,
+        vendedorId: p.vendedorId,
+        proyectoId: p.id,
+        clienteId: p.clienteId || '',
+        montoVenta: p.valorEstimado,
+        porcentaje,
+        montoComision: p.valorEstimado * (porcentaje / 100),
+        estado: 'pendiente' as ComisionEstado,
+        fechaVenta: new Date(p.fechaCreacion),
+      };
+    });
+
+  const filteredComisiones = comisiones.filter((c) => {
+    const vendedor = usuarios.find(u => u.id === c.vendedorId);
     const matchesSearch = vendedor
       ? `${vendedor.nombre} ${vendedor.apellido}`.toLowerCase().includes(searchTerm.toLowerCase())
       : false;
@@ -84,18 +61,18 @@ export default function ComisionesPage() {
   });
 
   const getVendedorName = (vendedorId: string) => {
-    const vendedor = mockUsers.find(u => u.id === vendedorId);
+    const vendedor = usuarios.find(u => u.id === vendedorId);
     return vendedor ? `${vendedor.nombre} ${vendedor.apellido}` : 'Desconocido';
   };
 
   const getClienteName = (clienteId: string) => {
-    const cliente = mockClientes.find(c => c.id === clienteId);
+    const cliente = clientes.find(c => c.id === clienteId);
     return cliente?.nombre || 'Cliente';
   };
 
   const getProyectoNombre = (proyectoId: string) => {
-    const proyecto = mockProyectos.find(p => p.id === proyectoId);
-    return proyecto?.nombre || 'Proyecto';
+    const prospecto = prospectos.find(p => p.id === proyectoId);
+    return prospecto?.empresa || 'Proyecto';
   };
 
   const getEstadoBadge = (estado: string): 'success' | 'warning' | 'primary' | 'neutral' => {
@@ -108,17 +85,17 @@ export default function ComisionesPage() {
   };
 
   // Stats
-  const totalComisiones = mockComisiones.reduce((sum, c) => sum + c.montoComision, 0);
-  const comisionesPagadas = mockComisiones.filter(c => c.estado === 'pagada').reduce((sum, c) => sum + c.montoComision, 0);
-  const comisionesPendientes = mockComisiones.filter(c => c.estado !== 'pagada').reduce((sum, c) => sum + c.montoComision, 0);
+  const totalComisiones = comisiones.reduce((sum, c) => sum + c.montoComision, 0);
+  const comisionesPagadasTotal = comisiones.filter(c => c.estado === 'pagada').reduce((sum, c) => sum + c.montoComision, 0);
+  const comisionesPendientes = comisiones.filter(c => c.estado !== 'pagada').reduce((sum, c) => sum + c.montoComision, 0);
 
   // Comisiones por vendedor
   const comisionesPorVendedor = vendedores.map(v => ({
     ...v,
-    totalComisiones: mockComisiones
+    totalComisiones: comisiones
       .filter(c => c.vendedorId === v.id)
       .reduce((sum, c) => sum + c.montoComision, 0),
-    comisionesPagadas: mockComisiones
+    comisionesPagadas: comisiones
       .filter(c => c.vendedorId === v.id && c.estado === 'pagada')
       .reduce((sum, c) => sum + c.montoComision, 0),
   }));
@@ -149,7 +126,7 @@ export default function ComisionesPage() {
             <p className="text-sm text-zinc-500 mb-1 flex items-center gap-1">
               <CheckCircle size={14} className="text-success-500" /> Pagadas
             </p>
-            <p className="text-2xl font-bold text-success-600">{formatCurrency(comisionesPagadas)}</p>
+            <p className="text-2xl font-bold text-success-600">{formatCurrency(comisionesPagadasTotal)}</p>
           </CardBody>
         </Card>
         <Card>

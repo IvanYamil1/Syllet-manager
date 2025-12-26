@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { MainLayout } from '@/components/layout';
 import { Button, Card, CardBody, CardHeader, Badge, Avatar } from '@/components/ui';
-import { mockProyectos, mockClientes } from '@/lib/mock-data';
+import { useAppStore } from '@/lib/store';
 import { formatDate } from '@/lib/utils';
 import {
   ChevronLeft,
@@ -16,6 +16,10 @@ import {
 
 export default function CalendarioPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Obtener datos del store
+  const proyectos = useAppStore((state) => state.proyectos);
+  const clientes = useAppStore((state) => state.clientes);
 
   const monthNames = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -63,20 +67,20 @@ export default function CalendarioPage() {
 
   // Get events (project deadlines)
   const getEventsForDate = (date: Date) => {
-    return mockProyectos.filter(p => {
+    return proyectos.filter(p => {
       const deadline = new Date(p.fechaEntregaEstimada);
       return deadline.toDateString() === date.toDateString();
     });
   };
 
   // Upcoming deadlines
-  const upcomingDeadlines = mockProyectos
+  const upcomingDeadlines = proyectos
     .filter(p => new Date(p.fechaEntregaEstimada) >= today && p.estado !== 'entregado')
     .sort((a, b) => new Date(a.fechaEntregaEstimada).getTime() - new Date(b.fechaEntregaEstimada).getTime())
     .slice(0, 5);
 
   const getClienteName = (clienteId: string) => {
-    const cliente = mockClientes.find(c => c.id === clienteId);
+    const cliente = clientes.find(c => c.id === clienteId);
     return cliente?.nombre || 'Cliente';
   };
 

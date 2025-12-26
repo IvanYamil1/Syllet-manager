@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MainLayout } from '@/components/layout';
 import { Button, Card, CardBody, CardHeader, Badge, Input } from '@/components/ui';
-import { mockTransacciones, mockMetricas } from '@/lib/mock-data';
+import { useAppStore } from '@/lib/store';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import {
   AreaChart,
@@ -33,25 +33,84 @@ import {
 export default function FinanzasPage() {
   const [periodo, setPeriodo] = useState('mes');
 
-  const ingresos = mockTransacciones.filter((t) => t.tipo === 'ingreso');
-  const egresos = mockTransacciones.filter((t) => t.tipo === 'egreso');
+  // Obtener datos del store
+  const transacciones = useAppStore((state) => state.transacciones);
+
+  const ingresos = transacciones.filter((t) => t.tipo === 'ingreso');
+  const egresos = transacciones.filter((t) => t.tipo === 'egreso');
 
   const totalIngresos = ingresos.reduce((sum, t) => sum + t.monto, 0);
   const totalEgresos = egresos.reduce((sum, t) => sum + t.monto, 0);
   const balance = totalIngresos - totalEgresos;
 
-  const pieData = [
-    { name: 'Ventas de Proyectos', value: 82500, color: '#5e63f1' },
-    { name: 'Servicios Recurrentes', value: 15000, color: '#10b981' },
-    { name: 'Otros', value: 5000, color: '#f59e0b' },
-  ];
+  // Calcular ingresos por mes dinámicamente
+  const ingresosPorMes = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const data = [];
 
-  const egresosData = [
-    { name: 'Publicidad', value: 8500, color: '#ef4444' },
-    { name: 'Herramientas', value: 3500, color: '#f59e0b' },
-    { name: 'Salarios', value: 45000, color: '#8b5cf6' },
-    { name: 'Otros', value: 2000, color: '#6b7280' },
-  ];
+    for (let i = 5; i >= 0; i--) {
+      const month = new Date(currentYear, currentMonth - i, 1);
+      const monthName = month.toLocaleDateString('es-MX', { month: 'short' });
+
+      const ingresosM = transacciones
+        .filter(t => {
+          const fecha = new Date(t.fecha);
+          return t.tipo === 'ingreso' &&
+            fecha.getMonth() === month.getMonth() &&
+            fecha.getFullYear() === month.getFullYear();
+        })
+        .reduce((sum, t) => sum + t.monto, 0);
+
+      const egresosM = transacciones
+        .filter(t => {
+          const fecha = new Date(t.fecha);
+          return t.tipo === 'egreso' &&
+            fecha.getMonth() === month.getMonth() &&
+            fecha.getFullYear() === month.getFullYear();
+        })
+        .reduce((sum, t) => sum + t.monto, 0);
+
+      data.push({
+        mes: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+        ingresos: ingresosM,
+        egresos: egresosM,
+        neto: ingresosM - egresosM,
+      });
+    }
+    return data;
+  }, [transacciones]);
+
+  // Calcular distribución de ingresos por categoría
+  const pieData = useMemo(() => {
+    const byCategory: Record<string, number> = {};
+    ingresos.forEach(t => {
+      const cat = t.categoria || 'otros';
+      byCategory[cat] = (byCategory[cat] || 0) + t.monto;
+    });
+    const colors = ['#5e63f1', '#10b981', '#f59e0b', '#8b5cf6'];
+    return Object.entries(byCategory).map(([name, value], idx) => ({
+      name: name.replace('_', ' '),
+      value,
+      color: colors[idx % colors.length],
+    }));
+  }, [ingresos]);
+
+  // Calcular distribución de egresos por categoría
+  const egresosData = useMemo(() => {
+    const byCategory: Record<string, number> = {};
+    egresos.forEach(t => {
+      const cat = t.categoria || 'otros';
+      byCategory[cat] = (byCategory[cat] || 0) + t.monto;
+    });
+    const colors = ['#ef4444', '#f59e0b', '#8b5cf6', '#6b7280'];
+    return Object.entries(byCategory).map(([name, value], idx) => ({
+      name: name.replace('_', ' '),
+      value,
+      color: colors[idx % colors.length],
+    }));
+  }, [egresos]);
 
   return (
     <MainLayout
@@ -139,7 +198,7 @@ export default function FinanzasPage() {
           <CardHeader title="Flujo de Efectivo" subtitle="Últimos 6 meses" />
           <CardBody className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockMetricas.ingresosPorMes}>
+              <AreaChart data={ingresosPorMes}>
                 <defs>
                   <linearGradient id="colorNeto" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#5e63f1" stopOpacity={0.3} />
@@ -234,7 +293,7 @@ export default function FinanzasPage() {
               </tr>
             </thead>
             <tbody>
-              {mockTransacciones.map((transaccion) => (
+              {transacciones.map((transaccion) => (
                 <tr key={transaccion.id}>
                   <td>
                     <div className="flex items-center gap-3">

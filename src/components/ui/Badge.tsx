@@ -44,12 +44,9 @@ export function getStatusBadgeVariant(
 ): 'primary' | 'success' | 'warning' | 'danger' | 'neutral' {
   const statusMap: Record<string, 'primary' | 'success' | 'warning' | 'danger' | 'neutral'> = {
     // Pipeline
-    lead: 'neutral',
     contacto: 'primary',
     cotizacion: 'warning',
-    negociacion: 'primary',
-    cierre: 'success',
-    perdido: 'danger',
+    proceso: 'primary',
     // Proyectos
     pendiente: 'neutral',
     en_desarrollo: 'primary',
@@ -76,18 +73,14 @@ export function getStatusBadgeVariant(
 
 export function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    // Pipeline
-    lead: 'Lead',
+    // Pipeline y Proyectos
     contacto: 'Contacto',
     cotizacion: 'Cotización',
-    negociacion: 'Negociación',
-    cierre: 'Cierre',
-    perdido: 'Perdido',
-    // Proyectos
+    proceso: 'En Proceso',
+    entregado: 'Entregado',
     pendiente: 'Pendiente',
     en_desarrollo: 'En Desarrollo',
     en_revision: 'En Revisión',
-    entregado: 'Entregado',
     cancelado: 'Cancelado',
     // Tickets
     abierto: 'Abierto',

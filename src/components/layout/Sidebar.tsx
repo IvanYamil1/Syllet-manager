@@ -118,12 +118,44 @@ export function Sidebar() {
   const { user, logout, hasPermission } = useAuth();
   const [expandedItems, setExpandedItems] = React.useState<string[]>([]);
 
-  const toggleExpand = (label: string) => {
-    setExpandedItems(prev =>
-      prev.includes(label)
-        ? prev.filter(item => item !== label)
-        : [...prev, label]
+  // Determinar qué categoría padre está activa basándose en el pathname actual
+  const getActiveParentCategory = React.useCallback(() => {
+    const parentItem = navigation.find(item =>
+      item.children && pathname.startsWith(item.href)
     );
+    return parentItem?.label || null;
+  }, [pathname]);
+
+  // Efecto para auto-expandir la categoría activa cuando cambia el pathname
+  React.useEffect(() => {
+    const activeCategory = getActiveParentCategory();
+    if (activeCategory && !expandedItems.includes(activeCategory)) {
+      setExpandedItems(prev => [...prev, activeCategory]);
+    }
+  }, [pathname, getActiveParentCategory]);
+
+  const toggleExpand = (label: string) => {
+    const clickedItem = navigation.find(item => item.label === label);
+    const activeCategory = getActiveParentCategory();
+
+    // Si el item clickeado tiene hijos
+    if (clickedItem?.children) {
+      setExpandedItems(prev => {
+        // Si ya está expandido, lo contraemos (pero solo si no estamos en una de sus páginas hijas)
+        if (prev.includes(label)) {
+          // No cerrar si estamos navegando dentro de esta categoría
+          if (activeCategory === label) {
+            return prev;
+          }
+          return prev.filter(item => item !== label);
+        }
+
+        // Si estamos expandiendo una nueva categoría
+        // Cerrar otras categorías que no son la activa
+        const newExpanded = prev.filter(item => item === activeCategory);
+        return [...newExpanded, label];
+      });
+    }
   };
 
   const isActive = (href: string) => pathname.startsWith(href);

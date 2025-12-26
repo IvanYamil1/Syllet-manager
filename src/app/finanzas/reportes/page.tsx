@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MainLayout } from '@/components/layout';
 import { Button, Card, CardBody, CardHeader, Badge } from '@/components/ui';
-import { mockMetricas } from '@/lib/mock-data';
+import { useAppStore } from '@/lib/store';
 import { formatCurrency } from '@/lib/utils';
 import {
   AreaChart,
@@ -34,51 +34,121 @@ import {
 export default function ReportesPage() {
   const [periodo, setPeriodo] = useState('mes');
 
-  const pieData = [
-    { name: 'Web Profesional', value: 45, color: '#5e63f1' },
-    { name: 'E-commerce', value: 30, color: '#10b981' },
-    { name: 'Landing Page', value: 15, color: '#f59e0b' },
-    { name: 'Sistemas', value: 10, color: '#8b5cf6' },
-  ];
+  // Obtener datos del store
+  const transacciones = useAppStore((state) => state.transacciones);
+  const proyectos = useAppStore((state) => state.proyectos);
+  const leads = useAppStore((state) => state.leads);
 
-  const egresosData = [
-    { categoria: 'Publicidad', monto: 25000 },
-    { categoria: 'Salarios', monto: 85000 },
-    { categoria: 'Herramientas', monto: 8500 },
-    { categoria: 'Oficina', monto: 5000 },
-    { categoria: 'Otros', monto: 3500 },
-  ];
+  // Calcular ingresos por mes dinámicamente
+  const ingresosPorMes = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const data = [];
 
-  const kpis = [
-    {
-      titulo: 'Margen de Ganancia',
-      valor: '62%',
-      cambio: '+5.2%',
-      tendencia: 'up',
-      descripcion: 'vs. mes anterior',
-    },
-    {
-      titulo: 'Ticket Promedio',
-      valor: formatCurrency(57000),
-      cambio: '+12%',
-      tendencia: 'up',
-      descripcion: 'Por proyecto',
-    },
-    {
-      titulo: 'Costo por Lead',
-      valor: formatCurrency(98),
-      cambio: '-8%',
-      tendencia: 'down',
-      descripcion: 'CPL promedio',
-    },
-    {
-      titulo: 'ROI Marketing',
-      valor: '285%',
-      cambio: '+15%',
-      tendencia: 'up',
-      descripcion: 'Retorno inversión',
-    },
-  ];
+    for (let i = 5; i >= 0; i--) {
+      const month = new Date(currentYear, currentMonth - i, 1);
+      const monthName = month.toLocaleDateString('es-MX', { month: 'short' });
+
+      const ingresosM = transacciones
+        .filter(t => {
+          const fecha = new Date(t.fecha);
+          return t.tipo === 'ingreso' &&
+            fecha.getMonth() === month.getMonth() &&
+            fecha.getFullYear() === month.getFullYear();
+        })
+        .reduce((sum, t) => sum + t.monto, 0);
+
+      const egresosM = transacciones
+        .filter(t => {
+          const fecha = new Date(t.fecha);
+          return t.tipo === 'egreso' &&
+            fecha.getMonth() === month.getMonth() &&
+            fecha.getFullYear() === month.getFullYear();
+        })
+        .reduce((sum, t) => sum + t.monto, 0);
+
+      data.push({
+        mes: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+        ingresos: ingresosM,
+        egresos: egresosM,
+        neto: ingresosM - egresosM,
+      });
+    }
+    return data;
+  }, [transacciones]);
+
+  // Calcular distribución de proyectos por tipo
+  const pieData = useMemo(() => {
+    const byType: Record<string, number> = {};
+    proyectos.forEach(p => {
+      const tipo = p.tipo || 'otros';
+      byType[tipo] = (byType[tipo] || 0) + 1;
+    });
+    const total = proyectos.length || 1;
+    const colors = ['#5e63f1', '#10b981', '#f59e0b', '#8b5cf6'];
+    return Object.entries(byType).map(([name, count], idx) => ({
+      name: name.replace('_', ' '),
+      value: Math.round((count / total) * 100),
+      color: colors[idx % colors.length],
+    }));
+  }, [proyectos]);
+
+  // Calcular egresos por categoría
+  const egresosData = useMemo(() => {
+    const byCategory: Record<string, number> = {};
+    transacciones
+      .filter(t => t.tipo === 'egreso')
+      .forEach(t => {
+        const cat = t.categoria || 'otros';
+        byCategory[cat] = (byCategory[cat] || 0) + t.monto;
+      });
+    return Object.entries(byCategory).map(([categoria, monto]) => ({
+      categoria: categoria.replace('_', ' '),
+      monto,
+    }));
+  }, [transacciones]);
+
+  // Calcular KPIs dinámicamente
+  const kpis = useMemo(() => {
+    const ingresos = transacciones.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + t.monto, 0);
+    const egresos = transacciones.filter(t => t.tipo === 'egreso').reduce((s, t) => s + t.monto, 0);
+    const margen = ingresos > 0 ? Math.round(((ingresos - egresos) / ingresos) * 100) : 0;
+    const ticketPromedio = proyectos.length > 0 ? Math.round(ingresos / proyectos.length) : 0;
+    const costoLead = leads.length > 0 ? Math.round(egresos / leads.length) : 0;
+    const roi = egresos > 0 ? Math.round(((ingresos - egresos) / egresos) * 100) : 0;
+
+    return [
+      {
+        titulo: 'Margen de Ganancia',
+        valor: `${margen}%`,
+        cambio: '+5.2%',
+        tendencia: 'up',
+        descripcion: 'vs. mes anterior',
+      },
+      {
+        titulo: 'Ticket Promedio',
+        valor: formatCurrency(ticketPromedio),
+        cambio: '+12%',
+        tendencia: 'up',
+        descripcion: 'Por proyecto',
+      },
+      {
+        titulo: 'Costo por Lead',
+        valor: formatCurrency(costoLead),
+        cambio: '-8%',
+        tendencia: 'down',
+        descripcion: 'CPL promedio',
+      },
+      {
+        titulo: 'ROI Marketing',
+        valor: `${roi}%`,
+        cambio: '+15%',
+        tendencia: 'up',
+        descripcion: 'Retorno inversión',
+      },
+    ];
+  }, [transacciones, proyectos, leads]);
 
   return (
     <MainLayout
@@ -146,7 +216,7 @@ export default function ReportesPage() {
           />
           <CardBody className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockMetricas.ingresosPorMes}>
+              <BarChart data={ingresosPorMes}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#71717a' }} />
                 <YAxis
@@ -178,7 +248,7 @@ export default function ReportesPage() {
           />
           <CardBody className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockMetricas.ingresosPorMes}>
+              <AreaChart data={ingresosPorMes}>
                 <defs>
                   <linearGradient id="colorNeto2" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#5e63f1" stopOpacity={0.3} />
